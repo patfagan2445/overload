@@ -396,7 +396,7 @@ function exCard(exId, sid){
       <div class="field"><button class="step" data-action="nudge" data-f="r" data-dir="-1" aria-label="Fewer reps">−</button>
         <input class="num" data-f="r" inputmode="numeric" value="${esc(rv)}" placeholder="${tr}" aria-label="Reps, set ${n}">
         <button class="step" data-action="nudge" data-f="r" data-dir="1" aria-label="More reps">+</button><span class="unit">reps</span></div>
-      <button class="check" data-action="${s ? 'unlog' : 'log'}" aria-label="${s ? 'Remove logged set' : 'Log set'}">✓</button>
+      <button class="check" data-action="${s ? 'unlog' : 'log'}" aria-label="${s ? 'Logged. Tap to save changes' : 'Log set'}">✓</button>
     </div>`;
   }
   return `<article class="ex">
@@ -594,7 +594,7 @@ async function exSettings(exId){
 function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => { t.style.display = 'none'; }, 2600); }
 
 function readRow(row){
-  const wI = row.querySelector('[data-f=w]'), rI = row.querySelector('[data-f=r]');
+  const wI = row.querySelector('input[data-f=w]'), rI = row.querySelector('input[data-f=r]');
   const w = wI.value.trim() === '' ? numOrNull(row.dataset.tw) : parseFloat(wI.value);
   const r = rI.value.trim() === '' ? numOrNull(row.dataset.tr) : parseInt(rI.value);
   return {w, r};
@@ -659,10 +659,14 @@ document.getElementById('root').addEventListener('click', async e => {
     case 'log': logRow(row); break;
     case 'unlog': {
       const s = state.sets[row.dataset.sid]; if (!s) break;
-      if (await confirmBox(`Remove set ${s.setNo}?`, `${fmt(s.w)} × ${s.r} will be removed from your log.`, 'Remove set')) { s.deleted = true; putSet(s); render(); }
+      const {w, r} = readRow(row);
+      if (w != null && !isNaN(w) && r > 0 && (w !== s.w || r !== s.r)) { s.w = w; s.r = r; putSet(s); render(); toast(`Set ${s.setNo} updated to ${fmt(w)} × ${r}`); break; }
+      const v = await showModal({title:`Set ${s.setNo} is logged`, body:`<p>${fmt(s.w)} × ${s.r}. To change it, edit the numbers and tap the check again.</p>`,
+        buttons:[{label:'Keep it', cls:'primary', value:'keep'}, {label:'Remove this set', cls:'danger', value:'remove'}]});
+      if (v === 'remove') { s.deleted = true; putSet(s); render(); }
       break; }
     case 'nudge': {
-      const f = el.dataset.f, dir = +el.dataset.dir, input = row.querySelector(`[data-f=${f}]`), ex = getEx(row.dataset.ex);
+      const f = el.dataset.f, dir = +el.dataset.dir, input = row.querySelector(`input[data-f=${f}]`), ex = getEx(row.dataset.ex);
       const cur = input.value.trim() === '' ? numOrNull(f === 'w' ? row.dataset.tw : row.dataset.tr) : parseFloat(input.value);
       const nv = f === 'w' ? nudgeW(ex, cur, dir) : Math.max(0, (cur || 0) + dir);
       input.value = fmt(nv);
